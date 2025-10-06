@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: video-downloader-api-node
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
