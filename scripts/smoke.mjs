@@ -1,5 +1,5 @@
 import request from "supertest";
-import { app } from "../app.js";
+import { app } from "../src/app.js";
 import assert from "assert";
 
 // Set required env for test run
