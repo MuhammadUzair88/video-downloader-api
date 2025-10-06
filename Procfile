@@ -1,3 +1,1 @@
 web: npm start
-runtime.txt
-python-3.11.0
