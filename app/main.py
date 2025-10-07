@@ -162,6 +162,10 @@ async def download_video(request: DownloadRequest):
     if os.path.exists(cookie_file_path):
         ydl_opts['cookiefile'] = cookie_file_path
 
+    temp_cookie_file_created = False
+    if cookies_env and not os.path.exists(os.path.join(os.path.dirname(__file__), "cookies.txt")):
+        temp_cookie_file_created = True
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
@@ -219,6 +223,9 @@ async def download_video(request: DownloadRequest):
         return DownloadResponse(error=str(e), formats=[])
     except Exception as e:
         return DownloadResponse(error="Internal server error: " + str(e), formats=[])
+    finally:
+        if temp_cookie_file_created and os.path.exists(cookie_file_path):
+            os.remove(cookie_file_path)
 
 
 @app.get("/api/v1/proxy-video")
