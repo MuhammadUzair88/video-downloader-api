@@ -4,3 +4,5 @@ services:
     env: node
     buildCommand: npm install
     startCommand: npm start
+    python:
+      version: 3.11.13
