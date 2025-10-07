@@ -98,6 +98,7 @@ from typing import List
 from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
+from fastapi.middleware.timeout import TimeoutMiddleware # Import TimeoutMiddleware
 import yt_dlp
 import aiohttp
 import os
@@ -124,6 +125,9 @@ app.add_middleware(
     allow_headers=["Content-Type", "X-API-Key"],
 )
 
+# Add TimeoutMiddleware with a 90-second timeout
+app.add_middleware(TimeoutMiddleware, timeout=90)
+
 
 @app.post("/api/v1/download", response_model=DownloadResponse, dependencies=[Depends(get_api_key)])
 async def download_video(request: DownloadRequest):
@@ -149,6 +153,7 @@ async def download_video(request: DownloadRequest):
         'format': 'bestvideo+bestaudio/best',
         'extract_flat': True,
         'force_generic_extractor': False,
+        'socket_timeout': 60, # Add socket timeout for yt-dlp
     }
 
     if os.path.exists(cookie_file_path):
