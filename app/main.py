@@ -102,6 +102,7 @@ import yt_dlp
 import aiohttp
 import os
 import tempfile
+import time # Import time module for cache TTL
 
 from .dependencies import get_api_key
 from .schemas import DownloadRequest, DownloadResponse, VideoFormat
@@ -112,7 +113,9 @@ app = FastAPI(
     version="1.1.1"
 )
 
-# ✅ CORS setup
+# In-memory cache for yt-dlp results
+video_cache = {}
+CACHE_TTL = 3600 # Cache Time-To-Live in seconds (1 hour)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -130,6 +133,11 @@ async def download_video(request: DownloadRequest):
     """
     Extract video metadata and formats from supported platforms.
     """
+    # Check cache first
+    if request.url in video_cache:
+        cached_data, timestamp = video_cache[request.url]
+        if time.time() - timestamp < CACHE_TTL:
+            return cached_data
 
     # 🔒 Option 1: Use cookies.txt file (included in repo)
     cookie_file_path = os.path.join(os.path.dirname(__file__), "cookies.txt")
@@ -189,7 +197,7 @@ async def download_video(request: DownloadRequest):
                 reverse=True
             )
 
-            return DownloadResponse(
+            response = DownloadResponse(
                 title=title,
                 uploader=uploader,
                 upload_date=upload_date,
@@ -202,6 +210,10 @@ async def download_video(request: DownloadRequest):
                 formats=formats,
                 error=None
             )
+
+            # Store in cache
+            video_cache[request.url] = (response, time.time())
+            return response
 
     except yt_dlp.utils.DownloadError as e:
         return DownloadResponse(error=str(e), formats=[])
