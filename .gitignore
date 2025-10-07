@@ -1,2 +1,15 @@
-node_modules
+# General
 .env
+**/.env
+
+# Node
+**/node_modules
+npm-debug.log
+yarn-error.log
+
+# Python
+**/__pycache__
+**/*.pyc
+.pytest_cache
+venv/
+.venv/
