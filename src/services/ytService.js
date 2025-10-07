@@ -17,6 +17,7 @@ export async function fetchVideoInfo(url) {
       format: "bestvideo+bestaudio/best",
       // Pass signal for abort
       signal: controller.signal,
+      cookies: process.env.INSTAGRAM_COOKIES,
     });
     clearTimeout(timeout);
     return result;
