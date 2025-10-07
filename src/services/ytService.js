@@ -1,4 +1,6 @@
 import youtubedl from "yt-dlp-exec";
+import fs from "fs/promises";
+import path from "path";
 
 /**
  * Fetch video info using yt-dlp without downloading.
