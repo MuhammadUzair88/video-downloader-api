@@ -100,6 +100,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 import yt_dlp
 import aiohttp
+import os
+import tempfile
 
 from .dependencies import get_api_key
 from .schemas import DownloadRequest, DownloadResponse, VideoFormat
@@ -107,43 +109,56 @@ from .schemas import DownloadRequest, DownloadResponse, VideoFormat
 app = FastAPI(
     title="Video Downloader API",
     description="A REST API for downloading videos from various social media platforms using yt-dlp, with metadata extraction.",
-    version="1.1.0"
+    version="1.1.1"
 )
 
-# Configure CORS middleware
+# ✅ CORS setup
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        # Add your production frontend URL, e.g., "https://your-frontend-domain.com"
+        "https://your-frontend-domain.com"
     ],
     allow_credentials=True,
     allow_methods=["POST", "GET"],
     allow_headers=["Content-Type", "X-API-Key"],
 )
 
+
 @app.post("/api/v1/download", response_model=DownloadResponse, dependencies=[Depends(get_api_key)])
 async def download_video(request: DownloadRequest):
     """
-    Endpoint to get downloadable video links and metadata from a given URL.
-    
-    - **url**: The video URL from supported platforms.
-    
-    Returns downloadable links for available formats (prioritizing video formats) plus extended metadata.
+    Extract video metadata and formats from supported platforms.
     """
+
+    # 🔒 Option 1: Use cookies.txt file (included in repo)
+    cookie_file_path = os.path.join(os.path.dirname(__file__), "cookies.txt")
+
+    # 🔒 Option 2: Use environment variable (safer)
+    if not os.path.exists(cookie_file_path):
+        cookies_env = os.getenv("INSTAGRAM_COOKIES")
+        if cookies_env:
+            temp_cookie = tempfile.NamedTemporaryFile(delete=False)
+            temp_cookie.write(cookies_env.encode('utf-8'))
+            temp_cookie.flush()
+            cookie_file_path = temp_cookie.name
+
     ydl_opts = {
         'quiet': True,
         'no_warnings': True,
-        'format': 'bestvideo+bestaudio/best',  # Prioritize best quality
-        'extract_flat': True,  # Avoid downloading, get metadata
-        'force_generic_extractor': False,  # Allow platform-specific extractors
+        'format': 'bestvideo+bestaudio/best',
+        'extract_flat': True,
+        'force_generic_extractor': False,
     }
-    
+
+    if os.path.exists(cookie_file_path):
+        ydl_opts['cookiefile'] = cookie_file_path
+
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(request.url, download=False)
-            
-            # Extract relevant info with type safety
+
+            # Extract metadata safely
             title = info.get('title')
             uploader = info.get('uploader')
             upload_date = info.get('upload_date')
@@ -152,9 +167,9 @@ async def download_video(request: DownloadRequest):
             like_count = int(info.get('like_count')) if info.get('like_count') else None
             comment_count = int(info.get('comment_count')) if info.get('comment_count') else None
             thumbnail = info.get('thumbnail')
-            duration = info.get('duration')  # Validator will handle float-to-int conversion
-            
-            # Get formats, filter for video/audio
+            duration = info.get('duration')
+
+            # Build formats list
             formats = []
             for f in info.get('formats', []):
                 if f.get('vcodec') != 'none' or f.get('acodec') != 'none':
@@ -168,10 +183,12 @@ async def download_video(request: DownloadRequest):
                         resolution=f.get('resolution'),
                         filesize=int(f.get('filesize')) if f.get('filesize') else None
                     ))
-            
-            # Sort formats: HD first, then SD, then Audio
-            formats.sort(key=lambda x: (x.quality == "HD", x.quality == "SD", x.quality == "Audio"), reverse=True)
-            
+
+            formats.sort(
+                key=lambda x: (x.quality == "HD", x.quality == "SD", x.quality == "Audio"),
+                reverse=True
+            )
+
             return DownloadResponse(
                 title=title,
                 uploader=uploader,
@@ -185,44 +202,17 @@ async def download_video(request: DownloadRequest):
                 formats=formats,
                 error=None
             )
-    
+
     except yt_dlp.utils.DownloadError as e:
-        return DownloadResponse(
-            title=None,
-            uploader=None,
-            upload_date=None,
-            description=None,
-            view_count=None,
-            like_count=None,
-            comment_count=None,
-            duration=None,
-            thumbnail=None,
-            formats=[],
-            error=str(e)
-        )
+        return DownloadResponse(error=str(e), formats=[])
     except Exception as e:
-        return DownloadResponse(
-            title=None,
-            uploader=None,
-            upload_date=None,
-            description=None,
-            view_count=None,
-            like_count=None,
-            comment_count=None,
-            duration=None,
-            thumbnail=None,
-            formats=[],
-            error="Internal server error: " + str(e)
-        )
+        return DownloadResponse(error="Internal server error: " + str(e), formats=[])
+
 
 @app.get("/api/v1/proxy-video")
 async def proxy_video(url: str):
     """
-    Proxy endpoint to stream video content, bypassing CORS restrictions.
-    
-    - **url**: The video URL to proxy.
-    
-    Returns a streaming response with CORS headers.
+    Proxy endpoint to stream video content, bypassing CORS.
     """
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
@@ -230,7 +220,6 @@ async def proxy_video(url: str):
                 raise HTTPException(status_code=400, detail="Failed to fetch video stream")
             headers = {
                 "Content-Type": resp.headers.get("Content-Type", "video/mp4"),
-                "Access-Control-Allow-Origin": "http://localhost:5173",
-                # Add production frontend URL if needed
+                "Access-Control-Allow-Origin": "*",
             }
             return StreamingResponse(resp.content, headers=headers)

@@ -27,10 +27,7 @@
 
 
 from typing import List, Optional
-from pydantic import BaseModel, validator
-
-class DownloadRequest(BaseModel):
-    url: str
+from pydantic import BaseModel
 
 class VideoFormat(BaseModel):
     quality: str
@@ -38,6 +35,9 @@ class VideoFormat(BaseModel):
     format_note: Optional[str]
     resolution: Optional[str]
     filesize: Optional[int]
+
+class DownloadRequest(BaseModel):
+    url: str
 
 class DownloadResponse(BaseModel):
     title: Optional[str]
@@ -47,13 +47,7 @@ class DownloadResponse(BaseModel):
     view_count: Optional[int]
     like_count: Optional[int]
     comment_count: Optional[int]
-    duration: Optional[int]  # Keep as int, but handle float conversion
+    duration: Optional[int]
     thumbnail: Optional[str]
     formats: List[VideoFormat]
-    error: Optional[str] = None
-
-    @validator('duration', pre=True)
-    def convert_duration_to_int(cls, value):
-        if isinstance(value, float):
-            return int(value)  # Convert float to int (e.g., 18.481 -> 18)
-        return value
+    error: Optional[str]

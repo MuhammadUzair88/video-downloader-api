@@ -1,17 +1,8 @@
-import os
-from fastapi import Depends, HTTPException, status
-from fastapi.security import APIKeyHeader
-from dotenv import load_dotenv
+from fastapi import Header, HTTPException
 
-load_dotenv()
+API_KEY = "your_secure_api_key_here"
 
-API_KEY = os.getenv("API_KEY")
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-def get_api_key(api_key: str = Depends(api_key_header)):
-    if api_key != API_KEY:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API Key"
-        )
-    return api_key
+def get_api_key(x_api_key: str = Header(...)):
+    if x_api_key != API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid API Key")
+    return x_api_key
